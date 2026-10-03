@@ -1294,15 +1294,39 @@ btnFlashEsp.addEventListener('click', async () => {
     });
 
     flasherTerminalLogger.writeLine('[OK] ¡Flasheo completado con éxito!');
-    updateFlasherStatus('¡Flasheo completado! Reiniciando ESP32...', 100);
+    updateFlasherStatus('¡Flasheo completado! Reiniciando ESP32...', 99);
 
-    // Hard reset into application
-    await espLoader.hardReset();
-    await transport.disconnect();
+    // Intentar reinicio automático a modo aplicación
+    try {
+      if (typeof espLoader.after === 'function') {
+        await espLoader.after('hard_reset');
+      }
+    } catch (resetErr) {
+      console.warn('Reinicio automático por after():', resetErr);
+    }
+
+    // Pulso RTS/DTR adicional
+    try {
+      if (transport) {
+        await transport.setDTR(false);
+        await transport.setRTS(true);
+        await new Promise(r => setTimeout(r, 100));
+        await transport.setRTS(false);
+      }
+    } catch (pulseErr) {
+      console.warn('Pulso RTS:', pulseErr);
+    }
+
+    // Desconectar puerto serie
+    try {
+      await transport.disconnect();
+    } catch (discErr) {}
     activeTransport = null;
 
-    showToast('¡Flasheo exitoso! Tu pantalla OLED ya está reproduciendo.');
-    flasherTerminalLogger.writeLine('[INFO] ESP32 reiniciado en modo ejecución.');
+    updateFlasherStatus('¡Flasheo completado! Reproduciendo video.', 100);
+    flasherTerminalLogger.writeLine('[OK] Proceso finalizado al 100%.');
+    flasherTerminalLogger.writeLine('[INFO] Si tu ESP32 no arranca de inmediato, presiona el botón RST / EN de la placa.');
+    showToast('¡Flasheo exitoso! Si no inicia solo, presiona el botón RST del ESP32.');
 
   } catch (err) {
     console.error('Error durante el flasheo:', err);
