@@ -1,0 +1,11 @@
+# Intermediate Arduino compilation artifacts
+universal_oled_player/build/
+*.elf
+*.map
+*.merged.bin
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

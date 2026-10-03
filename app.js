@@ -18,11 +18,22 @@ const thresholdSlider = document.getElementById('threshold-slider');
 const thresholdVal = document.getElementById('threshold-val');
 const invertCheck = document.getElementById('invert-check');
 
-// Crop Height Controls
+// Rotation Controls
+const rotationSelect = document.getElementById('rotation-select');
+const btnRotateCcw = document.getElementById('btn-rotate-ccw');
+const btnRotateCw = document.getElementById('btn-rotate-cw');
+let currentRotation = 0; // 0, 90, 180, 270
+
+// Crop Position Controls
 const cropPositionSection = document.getElementById('crop-position-section');
+const cropSliderLabel = document.getElementById('crop-slider-label');
 const cropYSlider = document.getElementById('crop-y-slider');
 const cropYVal = document.getElementById('crop-y-val');
 const btnCropPresets = document.querySelectorAll('.btn-crop-preset');
+const presetPosStart = document.getElementById('preset-pos-start');
+const presetPosCenter = document.getElementById('preset-pos-center');
+const presetPosEnd = document.getElementById('preset-pos-end');
+const cropSliderHint = document.getElementById('crop-slider-hint');
 
 const videoControlsSection = document.getElementById('video-controls-section');
 const fpsSelector = document.getElementById('fps-selector');
@@ -150,32 +161,116 @@ ditherModeSelect.addEventListener('change', () => {
 fitModeSelect.addEventListener('change', () => {
   const isCover = fitModeSelect.value === 'cover';
   cropPositionSection.style.display = isCover ? 'block' : 'none';
-  refreshImageDisplay();
+  updateCropUIForSource();
+  refreshCurrentPreview();
+});
+
+// Dynamic Crop UI based on image aspect ratio and orientation
+function updateCropUIForSource() {
+  let sw = 0, sh = 0;
+  if (!isVideo && loadedImage) {
+    sw = loadedImage.width;
+    sh = loadedImage.height;
+  } else if (isVideo && processVideo.duration) {
+    sw = processVideo.videoWidth || 128;
+    sh = processVideo.videoHeight || 64;
+  }
+  if (!sw || !sh) return;
+
+  const isRotated90 = currentRotation === 90 || currentRotation === 270;
+  const effSw = isRotated90 ? sh : sw;
+  const effSh = isRotated90 ? sw : sh;
+
+  const w = currentWidth;
+  const h = currentHeight;
+  const overflowsVertical = (effSh / effSw) > (h / w);
+
+  const val = parseInt(cropYSlider.value, 10);
+
+  if (overflowsVertical) {
+    // Vertical overflow (image is taller than display ratio)
+    cropSliderLabel.textContent = 'Altura de Encuadre (Crop Vertical):';
+    presetPosStart.textContent = 'Arriba';
+    presetPosCenter.textContent = 'Centro';
+    presetPosEnd.textContent = 'Abajo';
+    cropSliderHint.textContent = 'Desplaza verticalmente la imagen recortada para enfocar caras, textos o detalles.';
+    if (val === 0) cropYVal.textContent = 'Arriba (0%)';
+    else if (val === 50) cropYVal.textContent = 'Centro (50%)';
+    else if (val === 100) cropYVal.textContent = 'Abajo (100%)';
+    else cropYVal.textContent = `${val}%`;
+  } else {
+    // Horizontal overflow (image is wider than display ratio)
+    cropSliderLabel.textContent = 'Posición de Encuadre (Crop Horizontal):';
+    presetPosStart.textContent = 'Izquierda';
+    presetPosCenter.textContent = 'Centro';
+    presetPosEnd.textContent = 'Derecha';
+    cropSliderHint.textContent = 'Desplaza horizontalmente la imagen recortada para enfocar el elemento principal.';
+    if (val === 0) cropYVal.textContent = 'Izquierda (0%)';
+    else if (val === 50) cropYVal.textContent = 'Centro (50%)';
+    else if (val === 100) cropYVal.textContent = 'Derecha (100%)';
+    else cropYVal.textContent = `${val}%`;
+  }
+}
+
+function updateResolutionMeta() {
+  let sw = 0, sh = 0;
+  if (!isVideo && loadedImage) {
+    sw = loadedImage.width;
+    sh = loadedImage.height;
+  } else if (isVideo && processVideo.duration) {
+    sw = processVideo.videoWidth;
+    sh = processVideo.videoHeight;
+  }
+  if (!sw || !sh) return;
+
+  if (currentRotation === 90 || currentRotation === 270) {
+    metaRes.textContent = `${sw} x ${sh} px ➔ Rotado (${sh} x ${sw})`;
+  } else if (currentRotation === 180) {
+    metaRes.textContent = `${sw} x ${sh} px (180° Invertido)`;
+  } else {
+    metaRes.textContent = `${sw} x ${sh} px`;
+  }
+}
+
+function refreshCurrentPreview() {
+  if (!isVideo && loadedImage) {
+    refreshImageDisplay();
+  } else if (isVideo && processVideo.src) {
+    drawFrameToScratch(processVideo);
+    const xbm = convertCanvasToXBM(scratchCtx, currentWidth, currentHeight);
+    renderXbmFrame(xbm);
+  }
+}
+
+function setRotation(newRotation) {
+  currentRotation = (newRotation % 360 + 360) % 360;
+  rotationSelect.value = String(currentRotation);
+  updateCropUIForSource();
+  updateResolutionMeta();
+  refreshCurrentPreview();
+}
+
+rotationSelect.addEventListener('change', () => {
+  setRotation(parseInt(rotationSelect.value, 10));
+});
+
+btnRotateCcw.addEventListener('click', () => {
+  setRotation(currentRotation - 90);
+});
+
+btnRotateCw.addEventListener('click', () => {
+  setRotation(currentRotation + 90);
 });
 
 cropYSlider.addEventListener('input', () => {
   const val = parseInt(cropYSlider.value, 10);
-  if (val === 0) {
-    cropYVal.textContent = 'Arriba (0%)';
-  } else if (val === 50) {
-    cropYVal.textContent = 'Centro (50%)';
-  } else if (val === 100) {
-    cropYVal.textContent = 'Abajo (100%)';
-  } else {
-    cropYVal.textContent = `${val}%`;
-  }
+  updateCropUIForSource();
 
   btnCropPresets.forEach(b => {
     b.classList.toggle('active', parseInt(b.dataset.val, 10) === val);
   });
 
-  if (!isVideo && loadedImage) {
-    refreshImageDisplay();
-  } else if (isVideo && processVideo.src && !isPlaying && extractedFrames.length === 0) {
-    drawFrameToScratch(processVideo);
-    const xbm = convertCanvasToXBM(scratchCtx, currentWidth, currentHeight);
-    renderXbmFrame(xbm);
-  }
+  refreshCurrentPreview();
 });
 
 btnCropPresets.forEach(btn => {
@@ -337,7 +432,8 @@ function handleFile(file) {
     const url = URL.createObjectURL(file);
     processVideo.src = url;
     processVideo.onloadedmetadata = () => {
-      metaRes.textContent = `${processVideo.videoWidth} x ${processVideo.videoHeight} px`;
+      updateResolutionMeta();
+      updateCropUIForSource();
       metaDuration.textContent = `${processVideo.duration.toFixed(1)} segundos`;
       trimStart.value = 0;
 
@@ -376,7 +472,8 @@ function handleFile(file) {
     reader.onload = (event) => {
       loadedImage = new Image();
       loadedImage.onload = () => {
-        metaRes.textContent = `${loadedImage.width} x ${loadedImage.height} px`;
+        updateResolutionMeta();
+        updateCropUIForSource();
         metaDuration.textContent = imageMode === 'anim' 
           ? `Bucle animado (~${imgAnimDuration.value}s)` 
           : 'Imagen fija (1 fotograma)';
@@ -510,7 +607,7 @@ function seekVideo(time) {
   });
 }
 
-// Draw to scratch canvas with scaling mode
+// Draw to scratch canvas with scaling mode and orientation rotation
 function drawFrameToScratch(source) {
   const w = currentWidth;
   const h = currentHeight;
@@ -519,29 +616,60 @@ function drawFrameToScratch(source) {
 
   const sw = source.videoWidth || source.width;
   const sh = source.videoHeight || source.height;
+  if (!sw || !sh) return;
+
+  const isRotated90 = currentRotation === 90 || currentRotation === 270;
+  const effSw = isRotated90 ? sh : sw;
+  const effSh = isRotated90 ? sw : sh;
   const fit = fitModeSelect.value;
 
+  let dw, dh, dx, dy;
+
   if (fit === 'stretch') {
-    scratchCtx.drawImage(source, 0, 0, w, h);
+    dw = w;
+    dh = h;
+    dx = 0;
+    dy = 0;
   } else if (fit === 'contain') {
-    const scale = Math.min(w / sw, h / sh);
-    const dw = sw * scale;
-    const dh = sh * scale;
-    const dx = (w - dw) / 2;
-    const dy = (h - dh) / 2;
-    scratchCtx.drawImage(source, dx, dy, dw, dh);
+    const scale = Math.min(w / effSw, h / effSh);
+    dw = effSw * scale;
+    dh = effSh * scale;
+    dx = (w - dw) / 2;
+    dy = (h - dh) / 2;
   } else if (fit === 'cover') {
-    const scale = Math.max(w / sw, h / sh);
-    const dw = sw * scale;
-    const dh = sh * scale;
-    const dx = (w - dw) / 2;
+    const scale = Math.max(w / effSw, h / effSh);
+    dw = effSw * scale;
+    dh = effSh * scale;
 
-    // Ajuste de altura / desplazamiento vertical (0% = arriba, 50% = centro, 100% = abajo)
-    const cropYRatio = (cropYSlider ? parseInt(cropYSlider.value, 10) : 50) / 100;
-    const dy = (h - dh) * cropYRatio;
+    const cropRatio = (cropYSlider ? parseInt(cropYSlider.value, 10) : 50) / 100;
 
-    scratchCtx.drawImage(source, dx, dy, dw, dh);
+    if (dh > h) {
+      dy = (h - dh) * cropRatio;
+      dx = (w - dw) / 2;
+    } else if (dw > w) {
+      dx = (w - dw) * cropRatio;
+      dy = (h - dh) / 2;
+    } else {
+      dx = (w - dw) / 2;
+      dy = (h - dh) / 2;
+    }
   }
+
+  // Draw with rotation around the target bounding box center
+  const cx = dx + dw / 2;
+  const cy = dy + dh / 2;
+
+  scratchCtx.save();
+  scratchCtx.translate(cx, cy);
+  scratchCtx.rotate((currentRotation * Math.PI) / 180);
+
+  if (isRotated90) {
+    scratchCtx.drawImage(source, -dh / 2, -dw / 2, dh, dw);
+  } else {
+    scratchCtx.drawImage(source, -dw / 2, -dh / 2, dw, dh);
+  }
+
+  scratchCtx.restore();
 }
 
 function getEffectiveFps() {

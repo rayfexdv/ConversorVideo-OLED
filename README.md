@@ -54,11 +54,14 @@ Si prefieres personalizar el sketch o integrarlo con otros sensores/sensores de 
 
 ## 🎨 4. Funciones Destacadas del Estudio Web
 
+- **🔄 Rotación de Orientación (0°, 90°, 180°, 270°):**
+  - Botones rápidos (`-90°`, `+90°`) y menú desplegable para girar videos o imágenes verticales y adaptarlos perfectamente a la orientación horizontal de la pantalla 128x64.
+  - Al rotar a 90° o 270°, las proporciones y el escalado se recalculan automáticamente para aprovechar todo el ancho del display.
 - **✨ Modo "Luz y Sombras (3s)" para Imágenes:**
   - Transforma cualquier foto o logo estático en una animación fluida de 3 segundos variando el umbral de iluminación de forma senoidal.
   - Otorga relieve, sombras volumétricas y contraste dinámico sin necesidad de tener un archivo de video.
-- **Encuadre y Altura de Recorte (Crop Vertical):**
-  - Al seleccionar escala en modo **Rellenar y recortar (Crop)**, puedes ajustar con un deslizador (0% a 100%) o botones rápidos (`Arriba`, `Centro`, `Abajo`) la altura exacta del encuadre para enfocar rostros, textos o zonas clave.
+- **Encuadre y Recorte Dinámico (Crop Vertical u Horizontal):**
+  - Al seleccionar escala en modo **Rellenar y recortar (Crop)**, el control de encuadre detecta automáticamente si la imagen desborda verticalmente (`Arriba`, `Centro`, `Abajo`) u horizontalmente (`Izquierda`, `Centro`, `Derecha`), permitiendo enfocar con precisión caras, textos o logos.
 - **Recorte Automático a Segundos Enteros (MAX):**
   - Botón `MAX` y casilla de verificación para cortar el video exactamente al último segundo entero sin fracciones manuales.
 - **Simulador OLED Fotorrealista:**

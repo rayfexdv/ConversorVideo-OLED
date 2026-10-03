@@ -412,6 +412,45 @@ input:checked + .toggle-slider:before {
   transform: translateX(16px);
 }
 
+/* Rotation Control Group */
+.rotation-control-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.rotation-quick-btns {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.btn-rotate-chip {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-rotate-chip:hover {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  background: rgba(0, 229, 255, 0.08);
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.15);
+}
+
+.btn-rotate-chip:active {
+  transform: scale(0.96);
+}
+
 /* Crop position adjustment card */
 .crop-adjust-card {
   background: rgba(0, 229, 255, 0.04);

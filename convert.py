@@ -68,7 +68,7 @@ def frame_to_xbm(binary_matrix, width=128, height=64):
 
     return xbm_bytes
 
-def convert_video(input_path, output_path, width=128, height=64, fps=10, max_frames=100, threshold=128, invert=False):
+def convert_video(input_path, output_path, width=128, height=64, fps=10, max_frames=100, threshold=128, invert=False, rotate=0, fit="contain"):
     cap = cv2.VideoCapture(input_path)
     if not cap.isOpened():
         print(f"Error: No se pudo abrir {input_path}")
@@ -80,7 +80,7 @@ def convert_video(input_path, output_path, width=128, height=64, fps=10, max_fra
 
     print(f"Procesando: {input_path}")
     print(f"FPS Original: {video_fps:.1f} | FPS Destino: {fps} (Paso: cada {step} cuadros)")
-    print(f"Resolucion pantalla: {width}x{height}")
+    print(f"Resolucion pantalla: {width}x{height} | Rotacion: {rotate}° | Ajuste: {fit}")
 
     all_frames = []
     frame_idx = 0
@@ -92,9 +92,20 @@ def convert_video(input_path, output_path, width=128, height=64, fps=10, max_fra
             break
 
         if frame_idx % step == 0:
-            # Redimensionar conservando aspect ratio con letterbox negro
+            # Rotacion opcional
+            if rotate == 90:
+                frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+            elif rotate == 180:
+                frame = cv2.rotate(frame, cv2.ROTATE_180)
+            elif rotate == 270:
+                frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
             h_orig, w_orig = frame.shape[:2]
-            scale = min(width / w_orig, height / h_orig)
+            if fit == "cover":
+                scale = max(width / w_orig, height / h_orig)
+            else:
+                scale = min(width / w_orig, height / h_orig)
+
             nw, nh = int(w_orig * scale), int(h_orig * scale)
             resized = cv2.resize(frame, (nw, nh), interpolation=cv2.INTER_AREA)
 
@@ -102,7 +113,19 @@ def convert_video(input_path, output_path, width=128, height=64, fps=10, max_fra
             canvas = np.zeros((height, width, 3), dtype=np.uint8)
             dx = (width - nw) // 2
             dy = (height - nh) // 2
-            canvas[dy:dy+nh, dx:dx+nw] = resized
+
+            # Recorte o centrado
+            src_x1 = max(0, -dx)
+            src_y1 = max(0, -dy)
+            src_x2 = min(nw, width - dx)
+            src_y2 = min(nh, height - dy)
+
+            dst_x1 = max(0, dx)
+            dst_y1 = max(0, dy)
+            dst_x2 = dst_x1 + (src_x2 - src_x1)
+            dst_y2 = dst_y1 + (src_y2 - src_y1)
+
+            canvas[dst_y1:dst_y2, dst_x1:dst_x2] = resized[src_y1:src_y2, src_x1:src_x2]
 
             # Escala de grises
             gray = cv2.cvtColor(canvas, cv2.COLOR_BGR2GRAY)
@@ -163,8 +186,10 @@ if __name__ == "__main__":
     parser.add_argument("--max-frames", type=int, default=80, help="Maximo de cuadros")
     parser.add_argument("--threshold", type=int, default=128, help="Umbral (0-255)")
     parser.add_argument("--invert", action="store_true", help="Invertir colores")
+    parser.add_argument("--rotate", type=int, choices=[0, 90, 180, 270], default=0, help="Rotar imagen/video (0, 90, 180, 270)")
+    parser.add_argument("--fit", choices=["contain", "cover"], default="contain", help="Modo de ajuste (contain o cover)")
     parser.add_argument("--width", type=int, default=128, help="Ancho pantalla")
     parser.add_argument("--height", type=int, default=64, help="Alto pantalla")
 
     args = parser.parse_args()
-    convert_video(args.input, args.output, args.width, args.height, args.fps, args.max_frames, args.threshold, args.invert)
+    convert_video(args.input, args.output, args.width, args.height, args.fps, args.max_frames, args.threshold, args.invert, args.rotate, args.fit)
