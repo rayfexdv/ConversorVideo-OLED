@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OLED Video & Bitmap Studio | ESP32-S3 & U8g2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="main-header">
+      <div class="header-brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+        </div>
+        <div>
+          <h1>OLED Video Studio</h1>
+          <p class="subtitle">Conversor de Video e Imágenes a Mapa de Bits XBM para ESP32-S3 + SH1106 / U8g2</p>
+        </div>
+      </div>
+
+      <!-- Quick Hardware Pinout Badge -->
+      <div class="hardware-pill" id="pinout-pill">
+        <div class="pulse-dot"></div>
+        <div class="pill-info">
+          <span class="pill-label">Hardware: ESP32-S3 (16MB/8MB) + SH1106 1.3"</span>
+          <span class="pill-value">SDA: <strong>GPIO 8</strong> | SCL/SCK: <strong>GPIO 13</strong> (o GPIO 9)</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="workspace-grid">
+      <!-- Left Column: Source & Processing Controls -->
+      <section class="panel control-panel">
+        <div class="panel-header">
+          <div class="step-badge">1</div>
+          <h2>Cargar Archivo</h2>
+        </div>
+
+        <!-- Upload Dropzone -->
+        <div class="dropzone" id="dropzone">
+          <input type="file" id="file-input" accept="video/mp4,video/webm,video/ogg,image/gif,image/png,image/jpeg,image/webp">
+          <div class="dropzone-content">
+            <div class="upload-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+            </div>
+            <p class="drop-title">Arrastra tu video o imagen aquí</p>
+            <p class="drop-subtitle">Soporta <strong>MP4, WebM, GIF, PNG, JPG</strong></p>
+            <span class="file-size-badge">Límite recomendado: 25 MB</span>
+          </div>
+        </div>
+
+        <!-- Media Info bar -->
+        <div class="media-meta" id="media-meta" style="display: none;">
+          <div class="meta-item">
+            <span class="meta-label">Archivo:</span>
+            <span class="meta-val" id="meta-name">-</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Resolución:</span>
+            <span class="meta-val" id="meta-res">-</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Duración:</span>
+            <span class="meta-val" id="meta-duration">-</span>
+          </div>
+        </div>
+
+        <!-- Conversion Settings -->
+        <div class="panel-header" style="margin-top: 1.5rem;">
+          <div class="step-badge">2</div>
+          <h2>Configuración de Conversión</h2>
+        </div>
+
+        <div class="settings-form">
+          <!-- Resolution Selection -->
+          <div class="control-row">
+            <label for="display-res">Resolución Pantalla:</label>
+            <select id="display-res" class="custom-select">
+              <option value="128x64" selected>128 x 64 (SH1106 / SSD1306 Estándar)</option>
+              <option value="128x32">128 x 32 (OLED delgada)</option>
+              <option value="64x48">64 x 48 (Wemos mini OLED)</option>
+            </select>
+          </div>
+
+          <!-- Scaling Mode -->
+          <div class="control-row">
+            <label for="fit-mode">Ajuste de Escala:</label>
+            <select id="fit-mode" class="custom-select">
+              <option value="contain" selected>Ajustar manteniendo proporción (Letterbox)</option>
+              <option value="cover">Rellenar y recortar (Crop)</option>
+              <option value="stretch">Estirar a pantalla completa (Stretch)</option>
+            </select>
+          </div>
+
+          <!-- Crop Vertical Height / Position Adjustment -->
+          <div id="crop-position-section" class="control-row crop-adjust-card" style="display: none;">
+            <div class="label-with-value">
+              <label for="crop-y-slider">Altura de Encuadre (Crop Vertical):</label>
+              <span id="crop-y-val" class="badge-num">Centro (50%)</span>
+            </div>
+            <div class="crop-slider-container">
+              <input type="range" id="crop-y-slider" min="0" max="100" value="50" class="custom-slider">
+              <div class="crop-presets">
+                <button type="button" class="btn-crop-preset" data-val="0">Arriba</button>
+                <button type="button" class="btn-crop-preset active" data-val="50">Centro</button>
+                <button type="button" class="btn-crop-preset" data-val="100">Abajo</button>
+              </div>
+            </div>
+            <small class="hint-text">Desplaza verticalmente la imagen recortada para enfocar caras, textos o detalles.</small>
+          </div>
+
+          <!-- Binarization Algorithm -->
+          <div class="control-row">
+            <label for="dither-mode">Algoritmo Monocromático:</label>
+            <select id="dither-mode" class="custom-select">
+              <option value="floyd" selected>Floyd-Steinberg Dithering (Recomendado videos y fotos)</option>
+              <option value="threshold">Umbral directo (Ideal para logos y texto)</option>
+              <option value="atkinson">Atkinson Dithering (Estilo retro Mac)</option>
+            </select>
+          </div>
+
+          <!-- Threshold Slider -->
+          <div class="control-row">
+            <div class="label-with-value">
+              <label for="threshold-slider">Sensibilidad de Luz / Umbral:</label>
+              <span id="threshold-val" class="badge-num">128</span>
+            </div>
+            <input type="range" id="threshold-slider" min="10" max="245" value="128" class="custom-slider">
+          </div>
+
+          <!-- Invert Checkbox -->
+          <div class="control-checkbox">
+            <label class="toggle-container">
+              <input type="checkbox" id="invert-check">
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">Invertir colores (Fondo blanco / Pixeles negros)</span>
+          </div>
+
+          <!-- Image Specific Controls (Luz y Sombras) -->
+          <div id="image-controls-section" class="image-specific-card" style="display: none;">
+            <div class="card-header-with-badge">
+              <h3 class="subsection-title">Modo de Imagen</h3>
+              <span class="badge-mini">✨ Animador</span>
+            </div>
+
+            <div class="mode-pill-selector">
+              <label class="mode-pill-option active" id="mode-opt-static">
+                <input type="radio" name="image-mode" value="static" checked>
+                <span>🖼️ Cuadro Fijo</span>
+              </label>
+              <label class="mode-pill-option" id="mode-opt-anim">
+                <input type="radio" name="image-mode" value="anim">
+                <span>✨ Luz y Sombras (3s)</span>
+              </label>
+            </div>
+
+            <!-- Sub-options for Luz y Sombras -->
+            <div id="anim-image-options" style="display: none; margin-top: 0.85rem;">
+              <p class="hint-text" style="margin-bottom: 0.75rem;">
+                Crea un bucle continuo de 3 segundos variando el umbral de luz de forma senoidal. ¡Da profundidad y sensación de movimiento a fotos y logos!
+              </p>
+
+              <div class="grid-2-col">
+                <div class="control-group">
+                  <label for="img-anim-duration">Duración:</label>
+                  <select id="img-anim-duration" class="custom-select">
+                    <option value="2">2 segundos</option>
+                    <option value="3" selected>3 segundos (Recomendado)</option>
+                    <option value="4">4 segundos</option>
+                  </select>
+                </div>
+                <div class="control-group">
+                  <label for="img-anim-fps">Velocidad (FPS):</label>
+                  <select id="img-anim-fps" class="custom-select">
+                    <option value="10">10 FPS (30 cuadros)</option>
+                    <option value="15" selected>15 FPS (45 cuadros)</option>
+                    <option value="20">20 FPS (60 cuadros)</option>
+                    <option value="25">25 FPS (75 cuadros)</option>
+                    <option value="30">30 FPS (90 cuadros - Máx I2C)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="control-group" style="margin-top: 0.65rem;">
+                <label for="img-anim-intensity">Rango de Variación de Sombras:</label>
+                <select id="img-anim-intensity" class="custom-select">
+                  <option value="25">Sutil (Variación ±25)</option>
+                  <option value="45" selected>Equilibrado (Variación ±45)</option>
+                  <option value="65">Dramático / Alto contraste (±65)</option>
+                </select>
+              </div>
+
+              <button type="button" id="btn-generate-anim" class="btn btn-accent" style="margin-top: 0.85rem; width: 100%;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                <span>Generar Animación Luz y Sombras</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Video Specific Controls -->
+          <div id="video-controls-section" class="video-specific-card" style="display: none;">
+            <h3 class="subsection-title">Control de Video y Cuadros</h3>
+            
+            <div class="control-row">
+              <div class="label-with-value">
+                <label for="fps-selector">Velocidad (FPS de captura):</label>
+                <span id="fps-val" class="badge-num">10 FPS</span>
+              </div>
+              <input type="range" id="fps-selector" min="2" max="30" step="1" value="10" class="custom-slider">
+              <small class="hint-text">10-15 FPS ofrece gran fluidez. Hasta 30 FPS a 400kHz I2C.</small>
+            </div>
+
+            <div class="grid-2-col">
+              <div class="control-group">
+                <label for="trim-start">Inicio (seg):</label>
+                <input type="number" id="trim-start" min="0" step="0.1" value="0" class="custom-input">
+              </div>
+              <div class="control-group">
+                <div class="label-with-action">
+                  <label for="trim-end">Fin (seg):</label>
+                  <button type="button" id="btn-trim-max" class="btn-chip" title="Ajustar al máximo de segundos enteros">MAX</button>
+                </div>
+                <input type="number" id="trim-end" min="0.1" step="0.1" value="5" class="custom-input">
+              </div>
+            </div>
+
+            <!-- Auto MAX Checkbox -->
+            <div class="control-checkbox-mini" style="margin-top: 0.5rem;">
+              <label class="mini-toggle">
+                <input type="checkbox" id="check-trim-max">
+                <span class="mini-toggle-slider"></span>
+              </label>
+              <span class="mini-toggle-label">Ajustar automáticamente a segundos enteros máximos</span>
+            </div>
+
+            <div class="control-group" style="margin-top: 0.5rem;">
+              <label for="max-frames">Límite máx. de fotogramas:</label>
+              <input type="number" id="max-frames" min="1" max="600" value="80" class="custom-input">
+              <small class="hint-text">Tu ESP32-S3 (16MB Flash) puede soportar 500+ fotogramas sin problemas.</small>
+            </div>
+          </div>
+
+          <!-- Action Button -->
+          <button id="process-btn" class="btn btn-primary" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <span>Procesar y Extraer Fotogramas</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Right Column: OLED Screen Simulator & Code Export -->
+      <section class="panel preview-panel">
+        <div class="panel-header">
+          <div class="step-badge">3</div>
+          <h2>Simulador de Pantalla OLED 1.3" (SH1106)</h2>
+        </div>
+
+        <!-- OLED Screen Physical Bezel -->
+        <div class="oled-bezel-wrapper">
+          <div class="oled-bezel">
+            <div class="oled-header-marks">
+              <span class="oled-pin-mark">GND</span>
+              <span class="oled-pin-mark">VCC</span>
+              <span class="oled-pin-mark">SCK (13)</span>
+              <span class="oled-pin-mark">SDA (8)</span>
+            </div>
+            
+            <div class="oled-screen-surface">
+              <!-- Pixel Grid Canvas -->
+              <canvas id="oled-canvas" width="128" height="64"></canvas>
+              <div class="oled-glare"></div>
+            </div>
+
+            <div class="oled-footer-mark">SH1106 128x64 I2C OLED</div>
+          </div>
+        </div>
+
+        <!-- Player Timeline Controls -->
+        <div class="playback-bar" id="playback-bar">
+          <button id="play-pause-btn" class="btn-icon" title="Reproducir / Pausar">
+            <svg id="play-icon" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <svg id="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+              <rect x="6" y="4" width="4" height="16"></rect>
+              <rect x="14" y="4" width="4" height="16"></rect>
+            </svg>
+          </button>
+
+          <span id="frame-counter" class="frame-indicator">Cuadro 0 / 0</span>
+
+          <input type="range" id="scrubber" min="0" max="0" value="0" class="custom-slider scrubber-slider">
+
+          <div class="oled-color-picker">
+            <button class="color-dot active" data-color="#00e5ff" title="Azul Cian OLED" style="background: #00e5ff;"></button>
+            <button class="color-dot" data-color="#ffffff" title="Blanco Puro OLED" style="background: #ffffff;"></button>
+            <button class="color-dot" data-color="#39ff14" title="Verde Fósforo OLED" style="background: #39ff14;"></button>
+            <button class="color-dot" data-color="#ffb703" title="Amarillo Ámbar OLED" style="background: #ffb703;"></button>
+          </div>
+        </div>
+
+        <!-- Memory & Hardware Stats -->
+        <div class="stats-card">
+          <div class="stat-box">
+            <span class="stat-title">Fotogramas</span>
+            <span class="stat-value" id="stat-frames">0</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-title">Tamaño Total</span>
+            <span class="stat-value" id="stat-size">0 KB</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-title">Flash ESP32-S3</span>
+            <span class="stat-value" id="stat-flash-pct">0.0% / 16MB</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-title">Duración Anim.</span>
+            <span class="stat-value" id="stat-anim-time">0.0s</span>
+          </div>
+        </div>
+
+        <!-- Code Generator Tabs -->
+        <div class="panel-header" style="margin-top: 1.5rem;">
+          <div class="step-badge">4</div>
+          <h2>Código Listo para Arduino IDE (U8g2)</h2>
+        </div>
+
+        <div class="code-export-section">
+          <div class="tabs-header">
+            <button class="tab-btn active tab-btn-highlight" data-tab="web-flash">⚡ Grabar en ESP32 (Web USB)</button>
+            <button class="tab-btn" data-tab="arduino-sketch">Sketch Completo (.ino)</button>
+            <button class="tab-btn" data-tab="frames-header">Arreglos XBM (frames.h)</button>
+            <button class="tab-btn" data-tab="wiring-guide">Conexión de Pines</button>
+          </div>
+
+          <!-- Web Serial Direct USB Flasher Tab -->
+          <div class="tab-content" id="tab-web-flash">
+            <div class="flasher-card">
+              <!-- Browser Support Banner -->
+              <div id="serial-support-banner" class="flasher-banner"></div>
+
+              <div class="flasher-intro">
+                <div class="flasher-intro-text">
+                  <h3>Flasheo Directo a Cualquier ESP32 por USB</h3>
+                  <p>Conecta tu ESP32-S3 al puerto USB y graba el video directamente desde el navegador con <strong>Web Serial API</strong>. ¡No necesitas instalar Arduino IDE ni compilar nada!</p>
+                </div>
+              </div>
+
+              <!-- Flashing Mode Selection -->
+              <div class="flasher-mode-grid">
+                <label class="flasher-mode-card active" id="mode-flash-full">
+                  <input type="radio" name="flash-type" value="full" checked>
+                  <div class="mode-card-content">
+                    <span class="mode-badge primary">Recomendado</span>
+                    <h4>🚀 Instalación Completa (ESP32 Nuevo / 1ª Vez)</h4>
+                    <p>Flashea el Firmware Universal Reproductor + el Video actual. Ideal si tu ESP32 está nuevo o tiene otro código grabado.</p>
+                  </div>
+                </label>
+
+                <label class="flasher-mode-card" id="mode-flash-video-only">
+                  <input type="radio" name="flash-type" value="video-only">
+                  <div class="mode-card-content">
+                    <span class="mode-badge speed">Ultra Rápido (~2 seg)</span>
+                    <h4>⚡ Actualizar Solo Video</h4>
+                    <p>Escribe únicamente el nuevo video en la memoria Flash (offset 0x200000). Úsalo si ya flasheaste el reproductor antes.</p>
+                  </div>
+                </label>
+              </div>
+
+              <!-- Progress Bar -->
+              <div id="flasher-progress-box" class="flasher-progress-box" style="display: none;">
+                <div class="progress-info">
+                  <span id="flasher-status-label" class="progress-label">Conectando...</span>
+                  <span id="flasher-pct-label" class="progress-pct">0%</span>
+                </div>
+                <div class="progress-track">
+                  <div id="flasher-progress-bar" class="progress-fill" style="width: 0%;"></div>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="flasher-actions">
+                <button type="button" id="btn-flash-esp" class="btn btn-flash-primary">
+                  <svg viewBox="0 0 24 24" fill="currentColor" style="width: 18px; height: 18px;">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                  </svg>
+                  <span>Conectar y Grabar en ESP32</span>
+                </button>
+                <button type="button" id="btn-flash-cancel" class="btn btn-secondary" style="display: none;">Desconectar</button>
+                <button type="button" id="btn-toggle-terminal" class="btn btn-ghost">Mostrar Consola Serial</button>
+              </div>
+
+              <!-- Terminal Drawer -->
+              <div id="terminal-drawer" class="terminal-drawer" style="display: none;">
+                <div class="terminal-header">
+                  <span>Terminal Serial (esptool-js)</span>
+                  <button type="button" id="btn-clear-terminal" class="btn-chip">Limpiar</button>
+                </div>
+                <pre id="flasher-terminal" class="flasher-terminal"></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-arduino-sketch" style="display: none;">
+            <div class="code-wrapper">
+              <button class="copy-btn" id="copy-ino-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span>Copiar .INO</span>
+              </button>
+              <textarea id="code-ino-output" readonly spellcheck="false" placeholder="El código aparecerá aquí al procesar tu video o imagen..."></textarea>
+            </div>
+            <div class="code-actions">
+              <button class="btn btn-secondary" id="download-ino-btn">Descargar video_oled.ino</button>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-frames-header" style="display: none;">
+            <div class="code-wrapper">
+              <button class="copy-btn" id="copy-h-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span>Copiar frames.h</span>
+              </button>
+              <textarea id="code-h-output" readonly spellcheck="false" placeholder="Los arreglos XBM aparecerán aquí..."></textarea>
+            </div>
+            <div class="code-actions">
+              <button class="btn btn-secondary" id="download-h-btn">Descargar frames.h</button>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-wiring-guide" style="display: none;">
+            <div class="wiring-guide-box">
+              <h3>Esquema de Pines: ESP32-S3 N16R8 & Pantalla SH1106 1.3" I2C</h3>
+              <table class="wiring-table">
+                <thead>
+                  <tr>
+                    <th>Pantalla OLED (Pin)</th>
+                    <th>ESP32-S3 (Pin Recomendado)</th>
+                    <th>Tu Conexión Actual</th>
+                    <th>Notas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>GND</strong></td>
+                    <td>GND</td>
+                    <td>GND</td>
+                    <td>Tierra común</td>
+                  </tr>
+                  <tr>
+                    <td><strong>VCC</strong></td>
+                    <td>3.3V</td>
+                    <td>3.3V / 5V</td>
+                    <td>El SH1106 opera nativamente a 3.3V</td>
+                  </tr>
+                  <tr>
+                    <td><strong>SCK / SCL</strong></td>
+                    <td><strong>GPIO 13</strong> o <strong>GPIO 9</strong></td>
+                    <td><strong>GPIO 13</strong> ✅</td>
+                    <td>Reloj I2C. Configurable en Wire.begin()</td>
+                  </tr>
+                  <tr>
+                    <td><strong>SDA</strong></td>
+                    <td><strong>GPIO 8</strong></td>
+                    <td><strong>GPIO 8</strong> ✅</td>
+                    <td>Datos I2C. Por defecto en ESP32-S3</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="alert-box tip">
+                <strong>💡 Nota sobre tus pines (8 y 13):</strong> ¡Es 100% compatible! En el ESP32-S3, la matriz GPIO permite mapear I2C a cualquier pin digital libre. Usamos <code>Wire.begin(8, 13);</code> y <code>Wire.setClock(400000);</code> para alta tasa de refresco (Fast I2C 400kHz).
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Hidden Video & Canvas for processing -->
+    <video id="process-video" style="display: none;" playsinline muted></video>
+    <canvas id="scratch-canvas" width="128" height="64" style="display: none;"></canvas>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">Código copiado al portapapeles</div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
