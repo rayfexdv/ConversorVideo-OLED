@@ -117,15 +117,17 @@ function clearOled() {
 // Draw initial demo test pattern
 function drawWelcomeScreen() {
   oledCtx.fillStyle = '#000';
-  oledCtx.fillRect(0, 0, 128, 64);
+  oledCtx.fillRect(0, 0, currentWidth, currentHeight);
   oledCtx.fillStyle = oledColor;
   oledCtx.font = '10px monospace';
-  oledCtx.fillText('ESP32-S3 OLED 1.3"', 8, 20);
-  oledCtx.fillText('SDA: 8 | SCL: 13', 14, 35);
-  oledCtx.font = '8px monospace';
-  oledCtx.fillText('Arrastra un video aqui', 6, 52);
+  oledCtx.textAlign = 'center';
+  oledCtx.textBaseline = 'middle';
+  oledCtx.fillText('ESP-S3 OLED 1.3"', currentWidth / 2, currentHeight / 2 - 8);
+  oledCtx.fillText('SDA: 8 | SCL: 13', currentWidth / 2, currentHeight / 2 + 10);
   oledCtx.strokeStyle = oledColor;
-  oledCtx.strokeRect(2, 2, 124, 60);
+  oledCtx.strokeRect(2, 2, currentWidth - 4, currentHeight - 4);
+  oledCtx.textAlign = 'start';
+  oledCtx.textBaseline = 'alphabetic';
 }
 drawWelcomeScreen();
 
@@ -301,7 +303,22 @@ colorDots.forEach(dot => {
   });
 });
 
-// Drag and drop handlers
+// Prevent default browser behavior of opening dropped files in a new tab
+['dragover', 'drop'].forEach(eventName => {
+  window.addEventListener(eventName, (e) => {
+    e.preventDefault();
+  }, false);
+});
+
+window.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const files = e.dataTransfer ? e.dataTransfer.files : null;
+  if (files && files.length > 0) {
+    handleFile(files[0]);
+  }
+});
+
+// Drag and drop handlers for upload box visual state
 ['dragenter', 'dragover'].forEach(eventName => {
   dropzone.addEventListener(eventName, (e) => {
     e.preventDefault();
@@ -317,6 +334,7 @@ colorDots.forEach(dot => {
 });
 
 dropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
   const files = e.dataTransfer.files;
   if (files.length > 0) {
     handleFile(files[0]);
